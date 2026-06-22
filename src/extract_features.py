@@ -1,8 +1,8 @@
+# Extract log-mel spectrograms from LibriSpeech .flac files and save as .npy arrays.
 import os
 import numpy as np
 import librosa
 
-# ── SETTINGS ──────────────────────────────────────────
 DATA_DIR = "test-clean/LibriSpeech/test-clean"
 SAVE_DIR = "data"
 
@@ -22,7 +22,6 @@ N_MELS     = 80      # mel filterbank bands
 MAX_FRAMES = 301
 
 
-# ── HELPER: pad or truncate to MAX_FRAMES ─────────────
 def fix_length(feature, max_frames):
     if feature.shape[1] < max_frames:
         pad_amount = max_frames - feature.shape[1]
@@ -31,8 +30,6 @@ def fix_length(feature, max_frames):
         feature = feature[:, :max_frames]
     return feature
 
-
-# ── COLLECT .flac FILES FOR A LIST OF SPEAKERS ────────
 def collect_files(speaker_ids):
     files = []
     for speaker in speaker_ids:
@@ -48,7 +45,6 @@ def collect_files(speaker_ids):
     return files
 
 
-# ── EXTRACT FEATURES FROM A LIST OF FILES ─────────────
 def extract_features(audio_files, split_name):
     log_mel_list = []
     skipped      = 0
@@ -62,12 +58,11 @@ def extract_features(audio_files, split_name):
             skipped += 1
             continue
 
-        # ── LOG-MEL ───────────────────────────────────
-        # Shape: (N_MELS, time_frames) = (80, ~301)
+        # Shape: (N_MELS, time_frames)
         mel_spec = librosa.feature.melspectrogram(y=waveform, sr=SR, n_fft=N_FFT, hop_length=HOP_LENGTH, n_mels=N_MELS)
         log_mel = librosa.power_to_db(mel_spec, ref=np.max)
         log_mel = (log_mel - log_mel.mean()) / (log_mel.std() + 1e-8)
-        log_mel = fix_length(log_mel, MAX_FRAMES)   # → (80, 301)
+        log_mel = fix_length(log_mel, MAX_FRAMES)   
 
         log_mel_list.append(log_mel)
 
@@ -77,8 +72,6 @@ def extract_features(audio_files, split_name):
     print(f"  Done. Extracted {len(log_mel_list)} clips | Skipped: {skipped}")
     return np.stack(log_mel_list)
 
-
-# ── MAIN ──────────────────────────────────────────────
 if __name__ == "__main__":
 
     splits = {
@@ -110,8 +103,4 @@ if __name__ == "__main__":
         print(f"  Saved to '{split_dir}/'")
         print(f"    log_mel : {log_mel_array.shape}  → (n_clips, {N_MELS}, {MAX_FRAMES})")
 
-    print("\n[✓] All splits saved.")
-    print("    data/train/log_mel.npy")
-    print("    data/val/log_mel.npy")
-    print("    data/test/log_mel.npy")
-    print("\nNext step → python src/dataset.py")
+    print("saved to data/{train,val,test}/log_mel.npy")

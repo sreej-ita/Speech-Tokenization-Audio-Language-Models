@@ -10,32 +10,6 @@ from model import CNNAutoencoder
 from torch.utils.data import DataLoader
 
 
-# ─────────────────────────────────────────────────────
-# WHAT IS HAPPENING HERE?
-#
-# The autoencoder is trained. Now we freeze the encoder
-# and pass all audio through it to get latent vectors.
-#
-# These latent vectors are the "compressed representations"
-# in the mentor's chain:
-#   Raw(512) → Features(80) → Latent(20) → Token(1)
-#                                  ↑
-#                             we are here
-#
-# We do this for all 3 splits (train/val/test) so that:
-#   - train latents → used to build the VQ codebook
-#   - val/test latents → used to assign tokens & evaluate
-#
-# Usage:
-#   python src/encode.py
-#
-# Output:
-#   outputs/logmel/latents/train.npy  → (109, 20, 20, 76)
-#   outputs/logmel/latents/val.npy    → (116, 20, 20, 76)
-#   outputs/logmel/latents/test.npy   → (186, 20, 20, 76)
-# ─────────────────────────────────────────────────────
-
-
 DATA_PATHS = {
     "train": "data/train/log_mel.npy",
     "val"  : "data/val/log_mel.npy",
@@ -59,12 +33,7 @@ def encode():
     model.load_state_dict(ckpt["model_state"])
     model.eval()   # freeze batchnorm and dropout
 
-    print(f"\n{'='*52}")
-    print(f"  Encoding latents — LOG-MEL")
-    print(f"  Loaded model from epoch {ckpt['epoch']} "
-          f"(val loss: {ckpt['val_loss']:.4f})")
-    print(f"  Latent dim: {ckpt['latent_dim']}")
-    print(f"{'='*52}\n")
+    print(f"loaded epoch={ckpt['epoch']}  val_loss={ckpt['val_loss']:.4f}  latent={ckpt['latent_dim']}")
 
     # ── ENCODE ALL SPLITS ─────────────────────────────
     latent_dir = os.path.join("outputs", "logmel", "latents")
@@ -93,7 +62,7 @@ def encode():
         save_path = os.path.join(latent_dir, f"{split}.npy")
         np.save(save_path, latents)
 
-        print(f"  [{split:5s}] latent shape: {latents.shape} → saved to {save_path}")
+        print(f"[{split}] {latents.shape}  →  {save_path}")
 
     # ── FLATTEN TRAIN LATENTS FOR VQ ─────────────────
     # VQ needs a 2D array: (total_vectors, latent_dim)
@@ -109,13 +78,8 @@ def encode():
     flat_path = os.path.join(latent_dir, "train_flat.npy")
     np.save(flat_path, flat)
 
-    print(f"\n  [flat ] train latents for VQ: {flat.shape}")
-    print(f"          → {N} clips × {H}×{W} spatial positions × {D} dims")
-    print(f"          → saved to {flat_path}")
-
-    print(f"\n[✓] Encoding complete for LOG-MEL")
-    print(f"    Latents saved to: {latent_dir}")
-    print(f"\nNext step → python src/vq.py")
+    print(f"[flat] {flat.shape}  →  {flat_path}")
+    print("done")
 
 
 if __name__ == "__main__":

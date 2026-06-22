@@ -1,51 +1,24 @@
 import torch
 import torch.nn as nn
 
-
-# ─────────────────────────────────────────────────────
-# WHAT IS HAPPENING HERE?
-#
-# CNN Autoencoder with mentor-aligned compression chain:
-#
-#   Input  : (batch, 1, 80, 301)
-#   Latent : (batch, 20, 20, 76)   ← 20 = LATENT_DIM
-#   Output : (batch, 1, 80, 301)
-#
-# Compression chain per time frame:
-#   Raw audio  : 512 samples  (32ms window)
-#   Log-Mel    : 80 values    (mel filterbank)
-#   Latent     : 20 values    (CNN encoder bottleneck)  ← mentor's target
-#   Token      : 1 integer    (VQ codebook)
-# ─────────────────────────────────────────────────────
-
-
 class Encoder(nn.Module):
-    """
-    CNN Encoder: compresses (1, 80, T) → (latent_dim, 20, T//4)
-
-    Two Conv2d layers with stride=2 each halve both spatial dimensions.
-    Final Conv2d projects to latent_dim=20 channels (mentor's compression target).
-    """
+    """Two strided Conv2d layers compress (1, 80, T) → (latent_dim, 20, T//4)."""
     def __init__(self, latent_dim: int = 20):
         super().__init__()
         self.encoder = nn.Sequential(
-            # Layer 1: 1 → 32 channels, spatial size unchanged
+            
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
 
-            # Layer 2: 32 → 64, stride=2 halves height and width
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
 
-            # Layer 3: 64 → 128, spatial size unchanged
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
 
-            # Layer 4: 128 → latent_dim=20, stride=2 halves again
-            # After this: (batch, 20, 20, T//4)
             nn.Conv2d(128, latent_dim, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(latent_dim),
             nn.ReLU(),
@@ -58,11 +31,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """
-    CNN Decoder: expands (latent_dim, 20, T//4) → (1, 80, T)
-
-    Mirrors the encoder using ConvTranspose2d with stride=2 to upsample.
-    """
+    """Mirrors the encoder with ConvTranspose2d to recover (1, 80, T)."""
     def __init__(self, latent_dim: int = 20):
         super().__init__()
         self.decoder = nn.Sequential(
@@ -93,17 +62,7 @@ class Decoder(nn.Module):
 
 
 class CNNAutoencoder(nn.Module):
-    """
-    Full Autoencoder = Encoder + Decoder.
-
-    Usage:
-        model = CNNAutoencoder(latent_dim=20)
-        x_hat, z = model(x)
-
-        x     : (batch, 1, 80, T)          ← input log-mel
-        z     : (batch, 20, 20, T//4)      ← latent (compressed)
-        x_hat : (batch, 1, 80, T)          ← reconstruction
-    """
+    """Full autoencoder. Returns (x_hat, z) where z is the latent."""
     def __init__(self, latent_dim: int = 20):
         super().__init__()
         self.encoder    = Encoder(latent_dim)
@@ -122,7 +81,6 @@ class CNNAutoencoder(nn.Module):
         return self.encoder(x)
 
 
-# ── SANITY CHECK ──────────────────────────────────────
 if __name__ == "__main__":
 
     LATENT_DIM  = 20
@@ -144,6 +102,6 @@ if __name__ == "__main__":
 
     loss = nn.MSELoss()(x_hat, x)
     print(f"  MSE loss (untrained): {loss.item():.4f}")
-    print(f"  [✓] Checks passed")
+    print(f"   Checks passed")
 
-    print("\nNext step → python src/train.py")
+    print(f"ok  input={tuple(x.shape)}  latent={tuple(z.shape)}  output={tuple(x_hat.shape)}")

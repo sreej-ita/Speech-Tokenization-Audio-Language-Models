@@ -6,44 +6,6 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 
-# ─────────────────────────────────────────────────────
-# WHAT IS HAPPENING HERE?
-#
-# This is the final step — Residual Vector Quantization (RVQ).
-# Instead of one codebook, we use a stack of Q codebooks.
-# Each stage quantizes the RESIDUAL left by the previous stage.
-#
-# The mentor's compression chain completes here:
-#   Raw(512) → Features(80) → Latent(20) → Tokens(Q integers)
-#                                                  ↑
-#                                             we are here
-#
-# HOW RVQ WORKS:
-#   Stage 1: quantize z          → token_1, residual_1 = z - codebook_1[token_1]
-#   Stage 2: quantize residual_1 → token_2, residual_2 = residual_1 - codebook_2[token_2]
-#   ...
-#   Stage Q: quantize residual_{Q-1} → token_Q
-#
-#   Final token sequence per vector: [token_1, token_2, ..., token_Q]
-#   Reconstruction: codebook_1[t1] + codebook_2[t2] + ... + codebook_Q[tQ]
-#
-# WHY RVQ?
-#   A single VQ with 256 codes has limited resolution.
-#   RVQ with Q=4 stages and 256 codes each gives 256^4 effective codes
-#   while keeping each codebook small and fast to train.
-#   Used in EnCodec, SoundStream, and most modern audio codecs.
-#
-# Usage:
-#   python src/vq.py
-#
-# Output:
-#   outputs/logmel/codebook/codebook_stage{i}.npy  → (256, 20) per stage
-#   outputs/logmel/codebook/tokens_train.npy       → (N*H*W, Q) token IDs
-#   outputs/logmel/codebook/tokens_val.npy
-#   outputs/logmel/codebook/tokens_test.npy
-# ─────────────────────────────────────────────────────
-
-
 CODEBOOK_SIZE = 256   # number of codewords per stage (2^8, fits in one byte)
 RVQ_STAGES    = 4     # number of residual stages
                       # effective codes = 256^4 = ~4 billion
@@ -118,22 +80,15 @@ def quantize():
     train_flat = np.load(train_flat_path)   # (N, latent_dim)
     latent_dim = train_flat.shape[1]
 
-    print(f"\n{'='*52}")
-    print(f"  Residual Vector Quantization — LOG-MEL")
-    print(f"  Train vectors : {train_flat.shape}")
-    print(f"  Codebook size : {CODEBOOK_SIZE}  ×  {RVQ_STAGES} stages")
-    print(f"  Effective codes: {CODEBOOK_SIZE}^{RVQ_STAGES} = {CODEBOOK_SIZE**RVQ_STAGES:,}")
-    print(f"{'='*52}\n")
+    print(f"train={train_flat.shape}  codebook={CODEBOOK_SIZE}x{RVQ_STAGES}  effective={CODEBOOK_SIZE**RVQ_STAGES:,}")
 
     # ── TRAIN RVQ CODEBOOKS ───────────────────────────
-    print(f"[1/3] Training {RVQ_STAGES} codebooks with MiniBatchKMeans...")
+    
 
     codebooks = []
     residual  = train_flat.copy()
 
     for stage in range(RVQ_STAGES):
-        print(f"  Training stage {stage+1}/{RVQ_STAGES}  "
-              f"(residual variance: {residual.var():.4f})")
         cb = train_codebook(residual)
         codebooks.append(cb)
 
@@ -142,12 +97,9 @@ def quantize():
 
         # Advance residual
         _, residual = assign_tokens(residual, cb)
+        print(f"stage {stage+1}/{RVQ_STAGES}  residual_var={residual.var():.4f}")
 
-    print(f"  Final residual variance: {residual.var():.4f}  "
-          f"(lower = better reconstruction)")
-
-    # ── ASSIGN TOKENS FOR ALL SPLITS ─────────────────
-    print(f"\n[2/3] Assigning RVQ tokens to all splits...")
+    print(f"final residual_var={residual.var():.4f}")
 
     for split in ["train", "val", "test"]:
         lat_path = os.path.join(latent_dir, f"{split}.npy")
@@ -172,20 +124,11 @@ def quantize():
         token_path = os.path.join(codebook_dir, f"tokens_{split}.npy")
         np.save(token_path, tokens)
 
-        print(f"\n  [{split:5s}]  vectors={flat.shape}  tokens={tokens.shape}")
+        print(f"[{split}]  vectors={flat.shape}  tokens={tokens.shape}")
         for stage in range(RVQ_STAGES):
             compute_codebook_stats(tokens[:, stage], stage)
 
-    # ── SUMMARY ───────────────────────────────────────
-    print(f"\n[3/3] Summary — LOG-MEL RVQ:")
-    print(f"  Codebooks : codebook_stage1.npy … codebook_stage{RVQ_STAGES}.npy")
-    print(f"  Tokens    : tokens_train.npy / tokens_val.npy / tokens_test.npy")
-    print(f"              shape per split: (N*H*W, {RVQ_STAGES})")
-    print(f"\n  Compression chain complete:")
-    print(f"  Raw(512) → Log-Mel(80) → Latent(20) → RVQ Tokens({RVQ_STAGES} × {CODEBOOK_SIZE} codes)")
-
-    print(f"\n[✓] RVQ complete.")
-    print(f"\nNext step → python src/evaluate.py")
+    print("done")
 
 
 if __name__ == "__main__":
