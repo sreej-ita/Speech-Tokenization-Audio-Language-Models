@@ -11,7 +11,7 @@ A pipeline for discrete speech tokenization using CNNs and Vector Quantization, 
 ### Speech Tokenization Pipeline (In Progress)
 - Feature extraction implemented for Log-Mel spectrogram and MFCC using Librosa.
 - CNN Autoencoder trained with MSE loss on speaker-independent splits (train/val/test).
-- Latent representations being explored for discrete tokenization via Vector Quantization.
+- Latent representations being explored for discrete tokenization via Residual Vector Quantization.
 - Experimenting with codebook design and token quality evaluation.
 
 ## Data & Testing
