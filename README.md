@@ -69,8 +69,8 @@ python src/encode.py
 
 ### Vector Quantization
 ```bash
-python src/vq.py        # RVQ (4 stages)
-python src/vq_single.py # Single-stage VQ baseline
+python src/RVQ.py        # RVQ (4 stages)
+python src/VQ.py # Single-stage VQ baseline
 ```
 
 ### BPE Compression
